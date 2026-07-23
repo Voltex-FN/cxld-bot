@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder } = require("discord.js");
-const fs = require("fs");
+
+const API_URL = "https://cxld-api.onrender.com"; // Your Render API URL
 
 const client = new Client({
   intents: [
@@ -11,20 +12,6 @@ const client = new Client({
   ],
   partials: ["CHANNEL"]
 });
-
-function saveAccount(acc) {
-  let accounts = [];
-  try { accounts = JSON.parse(fs.readFileSync("accounts.json", "utf8")); } catch(e) {}
-  accounts.push(acc);
-  fs.writeFileSync("accounts.json", JSON.stringify(accounts, null, 2));
-}
-
-function genPass() {
-  const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
-  let p = "";
-  for(let i=0; i<10; i++) p += c[Math.floor(Math.random()*c.length)];
-  return p;
-}
 
 client.once("ready", async () => {
   console.log("Bot online: " + client.user.tag);
@@ -41,7 +28,7 @@ client.once("ready", async () => {
     Routes.applicationCommands(client.user.id), {body:cmds}
   );
   
-  console.log("Commands ready! Use /create");
+  console.log("Commands ready!");
 });
 
 client.on("interactionCreate", async (interaction) => {
@@ -51,25 +38,38 @@ client.on("interactionCreate", async (interaction) => {
   await interaction.reply({ content: "Creating account...", ephemeral: true });
   
   const username = interaction.options.getString("username");
-  const email = username.toLowerCase().replace(/[^a-z0-9]/g,"") + "@cxld.com";
-  const password = genPass();
-  
-  saveAccount({ username, email, password, discord: interaction.user.tag, time: new Date().toISOString() });
-  
-  const embed = new EmbedBuilder()
-    .setTitle("CXLD Account Created")
-    .setColor(0xc0c0c0)
-    .addFields(
-      {name:"Username", value:username},
-      {name:"Email", value:email},
-      {name:"Password", value:"||"+password+"||"}
-    );
   
   try {
-    await interaction.user.send({embeds:[embed]});
-    await interaction.editReply({ content: "Done! Check DMs", ephemeral: true });
+    // THIS IS WHERE THE API CALL GOES
+    const res = await fetch(API_URL + "/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      const embed = new EmbedBuilder()
+        .setTitle("CXLD Account Created")
+        .setColor(0xc0c0c0)
+        .addFields(
+          {name:"Username", value:data.data.username},
+          {name:"Email", value:data.data.email},
+          {name:"Password", value:"||"+data.data.password+"||"}
+        );
+      
+      try {
+        await interaction.user.send({embeds:[embed]});
+        await interaction.editReply({ content: "Done! Check DMs", ephemeral: true });
+      } catch(e) {
+        await interaction.editReply({ content: "Open your DMs!", ephemeral: true });
+      }
+    } else {
+      await interaction.editReply({ content: data.message, ephemeral: true });
+    }
   } catch(e) {
-    await interaction.editReply({ content: "Open your DMs and try again!", ephemeral: true });
+    await interaction.editReply({ content: "Server error. Try again.", ephemeral: true });
   }
 });
 
