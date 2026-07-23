@@ -12,13 +12,11 @@ const client = new Client({
   partials: ["CHANNEL"]
 });
 
-const accountsFile = "accounts.json";
-
 function saveAccount(acc) {
   let accounts = [];
-  try { accounts = JSON.parse(fs.readFileSync(accountsFile, "utf8")); } catch(e) {}
+  try { accounts = JSON.parse(fs.readFileSync("accounts.json", "utf8")); } catch(e) {}
   accounts.push(acc);
-  fs.writeFileSync(accountsFile, JSON.stringify(accounts, null, 2));
+  fs.writeFileSync("accounts.json", JSON.stringify(accounts, null, 2));
 }
 
 function genPass() {
@@ -43,7 +41,7 @@ client.once("ready", async () => {
     Routes.applicationCommands(client.user.id), {body:cmds}
   );
   
-  console.log("Commands registered! Try /create");
+  console.log("Commands ready! Use /create");
 });
 
 client.on("interactionCreate", async (interaction) => {
@@ -56,11 +54,7 @@ client.on("interactionCreate", async (interaction) => {
   const email = username.toLowerCase().replace(/[^a-z0-9]/g,"") + "@cxld.com";
   const password = genPass();
   
-  saveAccount({
-    username, email, password,
-    discord: interaction.user.tag,
-    time: new Date().toISOString()
-  });
+  saveAccount({ username, email, password, discord: interaction.user.tag, time: new Date().toISOString() });
   
   const embed = new EmbedBuilder()
     .setTitle("CXLD Account Created")
