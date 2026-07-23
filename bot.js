@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder } = require("discord.js");
 
-const API_URL = "https://cxld-api.onrender.com"; // Your Render API URL
+const API_URL = "https://cxld-server.onrender.com";
 
 const client = new Client({
   intents: [
