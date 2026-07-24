@@ -58,7 +58,7 @@ client.once("ready", async () => {
 });
 
 // ========== MEMBER COUNT CHANNEL ==========
-const MEMBER_COUNT_CHANNEL_ID = '1529750060957569166
+const MEMBER_COUNT_CHANNEL_ID = '1529750060957569166';
 
 function updateMemberCount(guild) {
   const channel = guild.channels.cache.get(MEMBER_COUNT_CHANNEL_ID);
@@ -71,7 +71,7 @@ client.on('guildMemberAdd', member => updateMemberCount(member.guild));
 client.on('guildMemberRemove', member => updateMemberCount(member.guild));
 
 // ========== VOICE CHANNEL JOIN/LEAVE ANNOUNCEMENTS ==========
-const LOG_CHANNEL_ID = 1529750054712115351
+const LOG_CHANNEL_ID = '1529750054712115351';
 
 client.on('voiceStateUpdate', (oldState, newState) => {
   const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
