@@ -1,26 +1,64 @@
-client.once("ready", () => {
+require("dotenv").config();
+const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder } = require("discord.js");
+const fs = require("fs");
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildVoiceStates,   // Needed for voice join detection
+    GatewayIntentBits.GuildMembers        // Needed for member join/leave
+  ],
+  partials: ["CHANNEL"]
+});
+
+function saveAccount(acc) {
+  let accounts = [];
+  try { accounts = JSON.parse(fs.readFileSync("accounts.json", "utf8")); } catch(e) {}
+  accounts.push(acc);
+  fs.writeFileSync("accounts.json", JSON.stringify(accounts, null, 2));
+}
+
+function genPass() {
+  const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
+  let p = "";
+  for(let i=0; i<10; i++) p += c[Math.floor(Math.random()*c.length)];
+  return p;
+}
+
+// ========== READY EVENT (COMBINED) ==========
+client.once("ready", async () => {
   console.log("Bot online: " + client.user.tag);
   
-  // Set rich presence
-  client.user.setActivity("CXLD Chapter 5", { type: 3 }); // 3 = WATCHING
-  // OR
-  client.user.setStatus("online"); // online, idle, dnd, invisible
+  // Register slash commands
+  const cmds = [
+    new SlashCommandBuilder()
+      .setName("create")
+      .setDescription("Create CXLD account")
+      .addStringOption(o => o.setName("username").setDescription("Your username").setRequired(true))
+      .toJSON()
+  ];
   
-  // Set custom status
+  await new REST({version:"10"}).setToken(process.env.DISCORD_TOKEN).put(
+    Routes.applicationCommands(client.user.id), {body:cmds}
+  );
+  
+  console.log("Commands ready! Use /create");
+  
+  // Set bot status
   client.user.setPresence({
     activities: [{ name: "CXLD Launcher", type: 2 }], // 2 = LISTENING
     status: "online"
   });
-});
-// ... your existing code (require, client setup, slash commands) ...
-
-client.once('ready', () => {
-  console.log('Bot online!');
-  // ... existing ready code ...
+  
+  // Initial member count update
+  client.guilds.cache.forEach(guild => updateMemberCount(guild));
 });
 
-// ADD NEW CODE HERE (after the ready event)
-const MEMBER_COUNT_CHANNEL_ID = 'VOICE_CHANNEL_ID'; // Replace with your channel ID
+// ========== MEMBER COUNT CHANNEL ==========
+const MEMBER_COUNT_CHANNEL_ID = 'YOUR_VOICE_CHANNEL_ID'; // Replace with your voice channel ID
 
 function updateMemberCount(guild) {
   const channel = guild.channels.cache.get(MEMBER_COUNT_CHANNEL_ID);
@@ -32,9 +70,51 @@ function updateMemberCount(guild) {
 client.on('guildMemberAdd', member => updateMemberCount(member.guild));
 client.on('guildMemberRemove', member => updateMemberCount(member.guild));
 
-// Your existing commands like /create, etc. remain below
-client.on('interactionCreate', async interaction => {
-  // ... your existing interaction code ...
+// ========== VOICE CHANNEL JOIN/LEAVE ANNOUNCEMENTS ==========
+const LOG_CHANNEL_ID = 'YOUR_TEXT_CHANNEL_ID'; // Replace with your text channel ID
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (!logChannel) return;
+  
+  // User joins a voice channel
+  if (!oldState.channel && newState.channel) {
+    logChannel.send(`${newState.member.user.tag} joined **${newState.channel.name}**`);
+  }
+  // User leaves a voice channel
+  if (oldState.channel && !newState.channel) {
+    logChannel.send(`${oldState.member.user.tag} left **${oldState.channel.name}**`);
+  }
 });
 
-client.login(process.env.DISCORD_TOKEN); // keep at the end
+// ========== /create COMMAND ==========
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isCommand()) return;
+  if (interaction.commandName !== "create") return;
+  
+  await interaction.reply({ content: "Creating account...", ephemeral: true });
+  
+  const username = interaction.options.getString("username");
+  const email = username.toLowerCase().replace(/[^a-z0-9]/g,"") + "@cxld.com";
+  const password = genPass();
+  
+  saveAccount({ username, email, password, discord: interaction.user.tag, time: new Date().toISOString() });
+  
+  const embed = new EmbedBuilder()
+    .setTitle("CXLD Account Created")
+    .setColor(0xc0c0c0)
+    .addFields(
+      {name:"Username", value:username},
+      {name:"Email", value:email},
+      {name:"Password", value:"||"+password+"||"}
+    );
+  
+  try {
+    await interaction.user.send({embeds:[embed]});
+    await interaction.editReply({ content: "Done! Check DMs", ephemeral: true });
+  } catch(e) {
+    await interaction.editReply({ content: "Open your DMs and try again!", ephemeral: true });
+  }
+});
+
+client.login(process.env.DISCORD_TOKEN);
